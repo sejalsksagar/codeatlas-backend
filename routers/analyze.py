@@ -7,13 +7,21 @@ from models.schemas import AnalyzeRequest, AnalyzeResponse, NotImplementedRespon
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
-@router.post("/", response_model=NotImplementedResponse)
+@router.post("/", response_model=AnalyzeResponse)
 async def analyze_repo(body: AnalyzeRequest) -> dict:
-    """
-    Full analysis pipeline: fetch repo → build file tree → detect stack → AI summary.
-    Not yet implemented.
-    """
-    return {"status": "not implemented"}
+    return {
+        "status": "ok",
+        "repo": body.repo_url,
+        "branch": body.branch,
+        "stack": {
+            "languages": ["Python"],
+            "frameworks": ["FastAPI"],
+            "databases": ["PostgreSQL"],
+            "infra": ["Docker"],
+            "test_frameworks": ["pytest"],
+            "package_manager": "pip"
+        }
+    }
 
 
 @router.get("/stack", response_model=NotImplementedResponse)

@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
-from core.github_client import github_client
+from core.github_client import GitHubClient
 from models.schemas import HealthResponse
 from routers import analyze
 
@@ -16,6 +16,10 @@ from routers import analyze
 # Lifespan: startup / shutdown hooks
 # ------------------------------------------------------------------ #
 
+# Persistent GitHub client
+github_client = GitHubClient(
+    token=settings.GITHUB_TOKEN
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
