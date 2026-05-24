@@ -12,7 +12,6 @@ detect_stack(file_paths, file_contents) -> StackResult
 
 from __future__ import annotations
 
-import re
 from pathlib import PurePosixPath
 from typing import Sequence
 
@@ -42,35 +41,68 @@ class StackResult(BaseModel):
 
 def _file_content(key: str, file_contents: dict[str, str]) -> str:
     """
-    Return the content for *key*, case-insensitively matching the basename.
-    Returns an empty string when the key is absent.
+    Return the content for *key*, preferring the shallowest (most root-level)
+    match when multiple files share the same basename.
+
+    e.g. key="requirements.txt" will prefer "requirements.txt" over
+    "docs/requirements.txt" or "tests/requirements.txt".
+
+    Returns an empty string when no match is found.
     """
-    # Exact match first (fastest path)
-    if key in file_contents:
-        return file_contents[key].lower()
-
-    # Basename-only fallback: e.g. caller passes "requirements.txt"
-    # and the dict key is "backend/requirements.txt"
     key_lower = key.lower()
-    for stored_key, content in file_contents.items():
-        if PurePosixPath(stored_key).name.lower() == key_lower:
-            return content.lower()
 
-    return ""
+    # Collect all matches with their depth (number of path segments - 1)
+    matches: list[tuple[int, str]] = []
+    for stored_key, content in file_contents.items():
+        normalised = stored_key.replace("\\", "/")
+        if PurePosixPath(normalised).name.lower() == key_lower:
+            depth = normalised.count("/")
+            matches.append((depth, content))
+
+    if not matches:
+        return ""
+
+    # Return content of the shallowest file (lowest depth wins)
+    matches.sort(key=lambda t: t[0])
+    return matches[0][1].lower()
+
+
+def _all_file_contents(key: str, file_contents: dict[str, str]) -> list[str]:
+    """
+    Return lowercased content for *every* file whose basename matches *key*.
+    Used when we want to scan all copies (e.g. all requirements.txt files).
+    """
+    key_lower = key.lower()
+    return [
+        content.lower()
+        for stored_key, content in file_contents.items()
+        if PurePosixPath(stored_key.replace("\\", "/")).name.lower() == key_lower
+    ]
 
 
 def _contains(content: str, *terms: str) -> bool:
-    """True when *all* terms appear in content (case-insensitive; content is pre-lowered)."""
+    """True when ALL terms appear in content (content is pre-lowered)."""
     return all(term.lower() in content for term in terms)
 
 
 def _any_contains(content: str, *terms: str) -> bool:
-    """True when *any* term appears in content (case-insensitive; content is pre-lowered)."""
+    """True when ANY term appears in content (content is pre-lowered)."""
     return any(term.lower() in content for term in terms)
 
 
+def _any_file_contains(key: str, file_contents: dict[str, str], *terms: str) -> bool:
+    """
+    True when ANY copy of *key* (by basename) contains ANY of *terms*.
+    Useful for files like requirements.txt that may exist at multiple depths.
+    """
+    return any(
+        _any_contains(content, *terms)
+        for content in _all_file_contents(key, file_contents)
+    )
+
+
 def _path_set(file_paths: Sequence[str]) -> set[str]:
-    """Normalise every path to forward-slash, lower-case for prefix / name matching."""
+    """Normalise to forward-slash, lower-case."""
     return {p.replace("\\", "/").lower() for p in file_paths}
 
 
@@ -85,20 +117,19 @@ def _basenames(file_paths: Sequence[str]) -> set[str]:
 
 def _detect_languages(file_paths: Sequence[str]) -> list[str]:
     """
-    Count file extensions and return the languages that appear at least once,
-    ordered by descending frequency.
+    Count file extensions; return languages sorted by descending frequency.
     """
     EXT_MAP: dict[str, str] = {
-        ".py": "Python",
-        ".js": "JavaScript/TypeScript",
-        ".ts": "JavaScript/TypeScript",
+        ".py":  "Python",
+        ".js":  "JavaScript/TypeScript",
+        ".ts":  "JavaScript/TypeScript",
         ".jsx": "JavaScript/TypeScript",
         ".tsx": "JavaScript/TypeScript",
-        ".go": "Go",
-        ".java": "Java",
-        ".rs": "Rust",
-        ".rb": "Ruby",
-        ".cs": "C#",
+        ".go":  "Go",
+        ".java":"Java",
+        ".rs":  "Rust",
+        ".rb":  "Ruby",
+        ".cs":  "C#",
         ".php": "PHP",
     }
 
@@ -109,50 +140,62 @@ def _detect_languages(file_paths: Sequence[str]) -> list[str]:
             lang = EXT_MAP[suffix]
             counts[lang] = counts.get(lang, 0) + 1
 
-    # Sort by frequency (desc) so the dominant language comes first
     return [lang for lang, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
 
 
 def _detect_frameworks(file_contents: dict[str, str]) -> list[str]:
     frameworks: list[str] = []
+    found: set[str] = set()
 
-    pkg = _file_content("package.json", file_contents)
-    req = _file_content("requirements.txt", file_contents)
-    pom = _file_content("pom.xml", file_contents)
-    go_mod = _file_content("go.mod", file_contents)
+    def _add(fw: str) -> None:
+        if fw not in found:
+            found.add(fw)
+            frameworks.append(fw)
 
-    # JavaScript / TypeScript frameworks (order matters: Next before React)
+    # ── Root-level config files (shallowest copy wins) ────────────────────────
+    pkg     = _file_content("package.json",    file_contents)
+    req     = _file_content("requirements.txt", file_contents)
+    pyproj  = _file_content("pyproject.toml",  file_contents)
+    pom     = _file_content("pom.xml",         file_contents)
+    go_mod  = _file_content("go.mod",          file_contents)
+
+    # ── JavaScript / TypeScript (Next before React — order matters) ───────────
     if pkg:
         if _contains(pkg, '"next"'):
-            frameworks.append("Next.js")
+            _add("Next.js")
         elif _contains(pkg, '"react"'):
-            # React-only: confirmed absent of Next
-            frameworks.append("React")
-
+            _add("React")
         if _contains(pkg, '"express"'):
-            frameworks.append("Express")
+            _add("Express")
         if _contains(pkg, '"fastify"'):
-            frameworks.append("Fastify")
+            _add("Fastify")
 
-    # Python frameworks
-    if req:
-        if _contains(req, "fastapi"):
-            frameworks.append("FastAPI")
-        if _contains(req, "django"):
-            frameworks.append("Django")
-        if _contains(req, "flask"):
-            frameworks.append("Flask")
+    # ── Python — check requirements.txt AND pyproject.toml ───────────────────
+    # We also scan ALL copies of requirements.txt (root + extras like
+    # requirements-dev.txt won't match, but multiple requirements.txt files
+    # in subdirectories will).
+    python_sources = [req, pyproj] + _all_file_contents("requirements.txt", file_contents)
 
-    # Java frameworks
+    for src in python_sources:
+        if not src:
+            continue
+        if _contains(src, "fastapi"):
+            _add("FastAPI")
+        if _contains(src, "django"):
+            _add("Django")
+        if _contains(src, "flask"):
+            _add("Flask")
+
+    # ── Java ─────────────────────────────────────────────────────────────────
     if pom and _contains(pom, "spring-boot"):
-        frameworks.append("Spring Boot")
+        _add("Spring Boot")
 
-    # Go frameworks
+    # ── Go ───────────────────────────────────────────────────────────────────
     if go_mod:
         if _contains(go_mod, "gin-gonic"):
-            frameworks.append("Gin")
+            _add("Gin")
         if _contains(go_mod, "fiber"):
-            frameworks.append("Fiber")
+            _add("Fiber")
 
     return frameworks
 
@@ -162,38 +205,39 @@ def _detect_databases(
     file_contents: dict[str, str],
 ) -> list[str]:
     databases: list[str] = []
-    found: set[str] = set()  # de-duplicate (e.g. pg detected twice)
-
-    req = _file_content("requirements.txt", file_contents)
-    pkg = _file_content("package.json", file_contents)
-    compose = _file_content("docker-compose.yml", file_contents)
+    found: set[str] = set()
 
     def _add(db: str) -> None:
         if db not in found:
             found.add(db)
             databases.append(db)
 
-    # Python deps
-    if req:
-        if _any_contains(req, "sqlalchemy", "psycopg"):
+    pkg     = _file_content("package.json",    file_contents)
+    compose = _file_content("docker-compose.yml", file_contents)
+
+    # Scan ALL requirements.txt copies + pyproject.toml for db deps
+    pyproj  = _file_content("pyproject.toml",  file_contents)
+    py_sources = _all_file_contents("requirements.txt", file_contents) + [pyproj]
+
+    for src in py_sources:
+        if not src:
+            continue
+        if _any_contains(src, "sqlalchemy", "psycopg"):
             _add("PostgreSQL")
-        if _contains(req, "pymongo"):
+        if _contains(src, "pymongo"):
             _add("MongoDB")
-        if _contains(req, "redis"):
+        if _contains(src, "redis"):
             _add("Redis")
 
-    # JS deps
     if pkg:
         if _contains(pkg, '"mongoose"'):
             _add("MongoDB")
         if _contains(pkg, '"prisma"'):
-            # Confirm via schema.prisma if available
             prisma_schema = _file_content("schema.prisma", file_contents)
-            if not prisma_schema or _contains(prisma_schema, "postgresql") or not prisma_schema:
-                # Default assumption for Prisma is PostgreSQL (its default provider)
+            # Default provider for Prisma is PostgreSQL
+            if not prisma_schema or _contains(prisma_schema, "postgresql"):
                 _add("PostgreSQL")
 
-    # docker-compose
     if compose:
         if _contains(compose, "mysql"):
             _add("MySQL")
@@ -210,23 +254,12 @@ def _detect_infra(file_paths: Sequence[str]) -> list[str]:
 
     if "dockerfile" in names:
         infra.append("Docker")
-
     if "docker-compose.yml" in names or "docker-compose.yaml" in names:
         infra.append("Docker Compose")
-
-    # GitHub Actions: any file under .github/workflows/
     if any(p.startswith(".github/workflows/") for p in paths):
         infra.append("GitHub Actions")
-
-    # Kubernetes: a directory named kubernetes/ or k8s/ at any depth
-    if any(
-        segment in ("kubernetes", "k8s")
-        for p in paths
-        for segment in p.split("/")
-    ):
+    if any(seg in ("kubernetes", "k8s") for p in paths for seg in p.split("/")):
         infra.append("Kubernetes")
-
-    # Terraform: a directory named terraform/ at any depth
     if any("terraform" in p.split("/") for p in paths):
         infra.append("Terraform")
 
@@ -235,17 +268,27 @@ def _detect_infra(file_paths: Sequence[str]) -> list[str]:
 
 def _detect_test_frameworks(file_contents: dict[str, str]) -> list[str]:
     test_frameworks: list[str] = []
+    found: set[str] = set()
 
-    req = _file_content("requirements.txt", file_contents)
-    pkg = _file_content("package.json", file_contents)
+    def _add(tf: str) -> None:
+        if tf not in found:
+            found.add(tf)
+            test_frameworks.append(tf)
 
-    if req and _contains(req, "pytest"):
-        test_frameworks.append("pytest")
+    pkg    = _file_content("package.json",   file_contents)
+    pyproj = _file_content("pyproject.toml", file_contents)
+
+    # Scan ALL requirements.txt files + pyproject.toml for pytest
+    py_sources = _all_file_contents("requirements.txt", file_contents) + [pyproj]
+    for src in py_sources:
+        if src and _contains(src, "pytest"):
+            _add("pytest")
+
     if pkg:
         if _contains(pkg, '"jest"'):
-            test_frameworks.append("Jest")
+            _add("Jest")
         if _contains(pkg, '"vitest"'):
-            test_frameworks.append("Vitest")
+            _add("Vitest")
 
     return test_frameworks
 
@@ -255,17 +298,24 @@ def _detect_package_manager(
     file_contents: dict[str, str],
 ) -> str | None:
     """
-    Infer the primary package manager from lock files and config files.
-    Priority: language-specific lock files > manifest presence.
+    Infer the primary package manager.
+    Priority: lock files > manifest files.
     """
     names = _basenames(file_paths)
 
-    # Python
+    # Python — check pyproject.toml build-backend to distinguish poetry vs pip
     if "poetry.lock" in names:
         return "poetry"
     if "pipfile.lock" in names or "pipfile" in names:
         return "pipenv"
-    if "requirements.txt" in names or "setup.py" in names or "pyproject.toml" in names:
+    if "uv.lock" in names:
+        return "uv"
+    if "pyproject.toml" in names:
+        pyproj = _file_content("pyproject.toml", file_contents)
+        if pyproj and "poetry" in pyproj:
+            return "poetry"
+        return "pip"
+    if "requirements.txt" in names or "setup.py" in names:
         return "pip"
 
     # JavaScript / TypeScript
@@ -276,15 +326,11 @@ def _detect_package_manager(
     if "package-lock.json" in names or "package.json" in names:
         return "npm"
 
-    # Go
+    # Go / Rust / Ruby
     if "go.sum" in names or "go.mod" in names:
         return "go modules"
-
-    # Rust
     if "cargo.lock" in names or "cargo.toml" in names:
         return "cargo"
-
-    # Ruby
     if "gemfile.lock" in names or "gemfile" in names:
         return "bundler"
 
@@ -309,9 +355,8 @@ async def detect_stack(
     file_paths:
         Every file path in the repository (relative, forward-slash separated).
     file_contents:
-        A mapping of ``{filename_or_relative_path: raw_text_content}`` for
-        files whose content was fetched (e.g. ``package.json``,
-        ``requirements.txt``).  Unknown / unbuffered files are simply absent.
+        Mapping of ``{path: raw_text}`` for files whose content was fetched.
+        Typically the output of fetching ``get_key_files()`` paths.
 
     Returns
     -------
@@ -328,16 +373,10 @@ async def detect_stack(
     )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Convenience sync wrapper (useful in tests / CLI without an event loop)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
 def detect_stack_sync(
     file_paths: Sequence[str],
     file_contents: dict[str, str],
 ) -> StackResult:
     """Synchronous thin wrapper around :func:`detect_stack`."""
     import asyncio
-
     return asyncio.run(detect_stack(file_paths, file_contents))

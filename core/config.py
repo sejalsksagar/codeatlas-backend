@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     GITHUB_TOKEN: str = ""
     GITHUB_MODELS_TOKEN: str = ""
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173", "https://codeatlas-frontend-khaki.vercel.app"]
 
 
 settings = Settings()

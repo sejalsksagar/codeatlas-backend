@@ -42,11 +42,14 @@ _KEY_FILE_NAMES: frozenset[str] = frozenset(
     [
         "package.json",
         "requirements.txt",
+        "pyproject.toml",       # modern Python projects (FastAPI, Django 4+, etc.)
         "go.mod",
         "pom.xml",
         "Cargo.toml",
         "docker-compose.yml",
+        "docker-compose.yaml",
         "Dockerfile",
+        "schema.prisma",        # Prisma DB provider confirmation
         ".env.example",
         "README.md",
         "main.py",
