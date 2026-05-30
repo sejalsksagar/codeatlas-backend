@@ -18,10 +18,7 @@ jobs:
 test:
 runs-on: ubuntu-latest
 
-permissions:
-  contents: read
-  models: read
-  
+ 
 env:
 GITHUB_MODELS_TOKEN: ${{ secrets.GITHUB_MODELS_TOKEN }}
 
