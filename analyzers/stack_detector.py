@@ -212,13 +212,13 @@ def _detect_databases(
             found.add(db)
             databases.append(db)
 
-    pkg     = _file_content("package.json",    file_contents)
+    pkg     = _file_content("package.json",      file_contents)
     compose = _file_content("docker-compose.yml", file_contents)
+    pom     = _file_content("pom.xml",            file_contents)
 
-    # Scan ALL requirements.txt copies + pyproject.toml for db deps
-    pyproj  = _file_content("pyproject.toml",  file_contents)
+    # Python: requirements.txt + pyproject.toml
+    pyproj     = _file_content("pyproject.toml", file_contents)
     py_sources = _all_file_contents("requirements.txt", file_contents) + [pyproj]
-
     for src in py_sources:
         if not src:
             continue
@@ -229,39 +229,89 @@ def _detect_databases(
         if _contains(src, "redis"):
             _add("Redis")
 
+    # Java: pom.xml — match XML artifactId / groupId patterns
+    if pom:
+        if _any_contains(pom, ">postgresql<", "org.postgresql", "pgjdbc"):
+            _add("PostgreSQL")
+        if _any_contains(pom, ">mysql-connector", "com.mysql", ">r2dbc-mysql<"):
+            _add("MySQL")
+        if _any_contains(pom, "data-mongodb", "flapdoodle.embed.mongo"):
+            _add("MongoDB")
+        if _any_contains(pom, "data-redis", ">jedis<", ">lettuce-core<"):
+            _add("Redis")
+        if _any_contains(pom, ">h2<", "com.h2database"):
+            _add("H2 (in-memory)")
+        if _any_contains(pom, "data-cassandra", "cassandra-driver"):
+            _add("Cassandra")
+
+    # JavaScript: package.json
     if pkg:
         if _contains(pkg, '"mongoose"'):
             _add("MongoDB")
         if _contains(pkg, '"prisma"'):
             prisma_schema = _file_content("schema.prisma", file_contents)
-            # Default provider for Prisma is PostgreSQL
             if not prisma_schema or _contains(prisma_schema, "postgresql"):
                 _add("PostgreSQL")
-
-    if compose:
-        if _contains(compose, "mysql"):
-            _add("MySQL")
-        if _contains(compose, "postgres"):
+        if _any_contains(pkg, '"pg"', '"postgres"', '"@neondatabase/serverless"'):
             _add("PostgreSQL")
+        if _any_contains(pkg, '"mysql2"', '"mysql"'):
+            _add("MySQL")
+        if _any_contains(pkg, '"ioredis"', '"redis"'):
+            _add("Redis")
+
+    # docker-compose.yml: image names
+    if compose:
+        if _any_contains(compose, "image: mysql", "image: mariadb"):
+            _add("MySQL")
+        if _any_contains(compose, "image: postgres", "image: postgis"):
+            _add("PostgreSQL")
+        if _any_contains(compose, "image: mongo", "image: bitnami/mongodb"):
+            _add("MongoDB")
+        if _any_contains(compose, "image: redis", "image: bitnami/redis"):
+            _add("Redis")
 
     return databases
 
 
-def _detect_infra(file_paths: Sequence[str]) -> list[str]:
+
+def _detect_infra(file_paths: Sequence[str], file_contents: dict[str, str] = {}) -> list[str]:
     infra: list[str] = []
+    found: set[str] = set()
+
+    def _add(item: str) -> None:
+        if item not in found:
+            found.add(item)
+            infra.append(item)
+
     paths = _path_set(file_paths)
     names = _basenames(file_paths)
 
     if "dockerfile" in names:
-        infra.append("Docker")
+        _add("Docker")
     if "docker-compose.yml" in names or "docker-compose.yaml" in names:
-        infra.append("Docker Compose")
+        _add("Docker Compose")
     if any(p.startswith(".github/workflows/") for p in paths):
-        infra.append("GitHub Actions")
+        _add("GitHub Actions")
     if any(seg in ("kubernetes", "k8s") for p in paths for seg in p.split("/")):
-        infra.append("Kubernetes")
+        _add("Kubernetes")
     if any("terraform" in p.split("/") for p in paths):
-        infra.append("Terraform")
+        _add("Terraform")
+
+    # Kafka: pom.xml, package.json, requirements.txt, or docker-compose image
+    pom     = _file_content("pom.xml",            file_contents)
+    pkg     = _file_content("package.json",        file_contents)
+    compose = _file_content("docker-compose.yml",  file_contents)
+    py_srcs = _all_file_contents("requirements.txt", file_contents)
+
+    if pom and _any_contains(pom, "spring-kafka", "kafka-clients", "kafka-streams"):
+        _add("Kafka")
+    if pkg and _any_contains(pkg, '"kafkajs"', '"kafka-node"', '"@confluentinc/kafka-javascript"'):
+        _add("Kafka")
+    if any(_contains(s, "kafka-python") or _contains(s, "confluent-kafka") for s in py_srcs if s):
+        _add("Kafka")
+    if compose and _any_contains(compose, "image: confluentinc/cp-kafka", "image: bitnami/kafka",
+                                  "image: apache/kafka", "confluentinc/cp-zookeeper"):
+        _add("Kafka")
 
     return infra
 
@@ -277,18 +327,45 @@ def _detect_test_frameworks(file_contents: dict[str, str]) -> list[str]:
 
     pkg    = _file_content("package.json",   file_contents)
     pyproj = _file_content("pyproject.toml", file_contents)
+    pom    = _file_content("pom.xml",        file_contents)
 
-    # Scan ALL requirements.txt files + pyproject.toml for pytest
+    # Python: requirements.txt files + pyproject.toml
     py_sources = _all_file_contents("requirements.txt", file_contents) + [pyproj]
     for src in py_sources:
         if src and _contains(src, "pytest"):
             _add("pytest")
 
+    # Java: pom.xml test-scoped dependencies
+    if pom:
+        # JUnit 5 (jupiter) or JUnit 4
+        if _any_contains(pom, "junit-jupiter", "junit-vintage", ">junit<"):
+            _add("JUnit")
+        # Mockito
+        if _contains(pom, "mockito"):
+            _add("Mockito")
+        # Spring Boot Test — canonical starter OR individual *-test starters
+        # (some projects list spring-boot-starter-data-jpa-test etc. individually)
+        if _any_contains(pom, "spring-boot-starter-test", "spring-boot-test",
+                         "starter-data-jpa-test", "starter-webmvc-test",
+                         "starter-kafka-test", "starter-web-test"):
+            _add("Spring Boot Test")
+        # maven-surefire is the standard JUnit runner in Maven builds
+        if _contains(pom, "maven-surefire-plugin"):
+            _add("JUnit")
+        # Testcontainers
+        if _contains(pom, "testcontainers"):
+            _add("Testcontainers")
+
+    # JavaScript / TypeScript
     if pkg:
         if _contains(pkg, '"jest"'):
             _add("Jest")
         if _contains(pkg, '"vitest"'):
             _add("Vitest")
+        if _contains(pkg, '"mocha"'):
+            _add("Mocha")
+        if _contains(pkg, '"jasmine"'):
+            _add("Jasmine")
 
     return test_frameworks
 
@@ -367,7 +444,7 @@ async def detect_stack(
         languages=_detect_languages(file_paths),
         frameworks=_detect_frameworks(file_contents),
         databases=_detect_databases(file_paths, file_contents),
-        infra=_detect_infra(file_paths),
+        infra=_detect_infra(file_paths, file_contents),
         test_frameworks=_detect_test_frameworks(file_contents),
         package_manager=_detect_package_manager(file_paths, file_contents),
     )
