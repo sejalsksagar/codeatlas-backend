@@ -227,6 +227,18 @@ REPOS = {
             "frameworks": ["Express"],
         },
     },
+    # ── Spring Boot + Kafka + PostgreSQL + MongoDB ───────────────────────────
+    "pos_emi_springboot": {
+        "url": "https://github.com/sejalsksagar/pos-emi-reward-negotiation-system",
+        "branch": "HEAD",
+        "expect": {
+            "languages": ["Java"],
+            "frameworks": ["Spring Boot"],
+            "databases": ["PostgreSQL", "MongoDB"],
+            "infra": ["Kafka", "Docker Compose"],
+            "test_frameworks": ["Spring Boot Test", "JUnit"],
+        },
+    },
     # ── Django ────────────────────────────────────────────────────────────────
     # Django's own repo uses setup.cfg / pyproject.toml, not requirements.txt
     "django": {

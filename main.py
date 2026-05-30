@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.github_client import GitHubClient
 from models.schemas import HealthResponse
-from routers import analyze
+from routers import analyze, diagram, suggestions
 
 
 # ------------------------------------------------------------------ #
@@ -52,6 +52,8 @@ app.add_middleware(
 
 # Routers
 app.include_router(analyze.router)
+app.include_router(diagram.router)
+app.include_router(suggestions.router)
 
 
 # ------------------------------------------------------------------ #

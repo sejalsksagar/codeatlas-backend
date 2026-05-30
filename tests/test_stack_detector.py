@@ -497,3 +497,117 @@ class TestEdgeCases:
         assert "FastAPI" in fw
         assert "Flask" in fw
         assert "Django" in fw
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Java / pom.xml detection (added after real-repo debugging)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestJavaPomDetection:
+    """Tests derived from the actual pos-emi-reward-negotiation-system pom.xml."""
+
+    POM_FULL = """<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <parent><artifactId>spring-boot-starter-parent</artifactId></parent>
+  <dependencies>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-kafka</artifactId></dependency>
+    <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-mongodb</artifactId></dependency>
+    <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa-test</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-kafka-test</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
+  </plugins></build>
+</project>"""
+
+    COMPOSE_KAFKA = """version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+"""
+
+    def test_postgresql_from_pom_org_postgresql(self):
+        contents = {"pom.xml": self.POM_FULL}
+        assert "PostgreSQL" in _detect_databases([], contents)
+
+    def test_mongodb_from_pom_data_mongodb(self):
+        contents = {"pom.xml": self.POM_FULL}
+        assert "MongoDB" in _detect_databases([], contents)
+
+    def test_kafka_from_pom_spring_kafka(self):
+        contents = {"pom.xml": self.POM_FULL}
+        infra = _detect_infra([], contents)
+        assert "Kafka" in infra
+
+    def test_kafka_from_compose_confluentinc_image(self):
+        contents = {"docker-compose.yml": self.COMPOSE_KAFKA}
+        infra = _detect_infra(["docker-compose.yml"], contents)
+        assert "Kafka" in infra
+
+    def test_spring_boot_test_from_nonstandard_starters(self):
+        """spring-boot-starter-data-jpa-test etc. should still trigger Spring Boot Test."""
+        contents = {"pom.xml": self.POM_FULL}
+        tf = _detect_test_frameworks(contents)
+        assert "Spring Boot Test" in tf
+
+    def test_junit_from_maven_surefire(self):
+        contents = {"pom.xml": self.POM_FULL}
+        tf = _detect_test_frameworks(contents)
+        assert "JUnit" in tf
+
+    def test_junit_from_junit_jupiter(self):
+        pom = "<dependency><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>"
+        tf = _detect_test_frameworks({"pom.xml": pom})
+        assert "JUnit" in tf
+
+    def test_mockito_detection(self):
+        pom = "<dependency><artifactId>mockito-core</artifactId><scope>test</scope></dependency>"
+        tf = _detect_test_frameworks({"pom.xml": pom})
+        assert "Mockito" in tf
+
+    def test_testcontainers_detection(self):
+        pom = "<dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId></dependency>"
+        tf = _detect_test_frameworks({"pom.xml": pom})
+        assert "Testcontainers" in tf
+
+    def test_mysql_from_pom(self):
+        pom = "<dependency><groupId>com.mysql</groupId><artifactId>mysql-connector-j</artifactId></dependency>"
+        assert "MySQL" in _detect_databases([], {"pom.xml": pom})
+
+    def test_redis_from_pom(self):
+        pom = "<dependency><artifactId>spring-boot-starter-data-redis</artifactId></dependency>"
+        assert "Redis" in _detect_databases([], {"pom.xml": pom})
+
+    def test_h2_from_pom(self):
+        pom = "<dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId></dependency>"
+        assert "H2 (in-memory)" in _detect_databases([], {"pom.xml": pom})
+
+    def test_full_springboot_project_end_to_end(self):
+        """End-to-end: replicates the pos-emi repo exactly."""
+        file_paths = [
+            "backend/hackathon/pom.xml",
+            "docker-compose.yml",
+            "backend/hackathon/src/main/java/com/pos/Application.java",
+            "backend/hackathon/src/test/java/com/pos/AppTest.java",
+        ]
+        file_contents = {
+            "backend/hackathon/pom.xml": self.POM_FULL,
+            "docker-compose.yml": self.COMPOSE_KAFKA,
+        }
+        result = run(detect_stack(file_paths, file_contents))
+        assert "Java"             in result.languages
+        assert "Spring Boot"      in result.frameworks
+        assert "PostgreSQL"       in result.databases
+        assert "MongoDB"          in result.databases
+        assert "Kafka"            in result.infra
+        assert "Docker Compose"   in result.infra
+        assert "Spring Boot Test" in result.test_frameworks
+        assert "JUnit"            in result.test_frameworks
