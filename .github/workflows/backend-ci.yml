@@ -1,3 +1,4 @@
+```yaml
 name: Backend CI
 
 on:
@@ -22,7 +23,7 @@ runs-on: ubuntu-latest
 env:
 GITHUB_MODELS_TOKEN: ${{ secrets.GITHUB_MODELS_TOKEN }}
 
-```
+
 steps:
   - name: Checkout Code
     uses: actions/checkout@v4
