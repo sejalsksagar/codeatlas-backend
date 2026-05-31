@@ -244,7 +244,7 @@ For frontend installation and setup, refer to the Readme File of [Frontend Repos
 **Role:** Frontend Engineering & UI/UX  
 **LinkedIn:** [https://www.linkedin.com/in/priya-sharma-mitwpu/]
 
-### 👩‍💼 Member 3
+### 👩‍💻 Member 3
 **Role:** Architecture, Integration & Product Presentation  
 **LinkedIn:** [https://www.linkedin.com/in/soumyashri-singha-6850a2210/]
 
