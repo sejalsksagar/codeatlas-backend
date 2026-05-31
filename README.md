@@ -118,7 +118,7 @@ Repository URL input screen where users can submit any public GitHub repository 
 * Repository URL validation
 * Single-click analysis workflow
 
-<img width="1884" height="886" alt="CodeAtlas_Landing_Page" src="https://github.com/user-attachments/assets/c4011a34-1d39-4e05-ad36-77e3b489f1d7" />
+<img width="1591" height="799" alt="image" src="https://github.com/user-attachments/assets/e101fc21-8c1f-48a5-a932-f9649fbbbaf2" />
 
 
 ---
@@ -134,7 +134,8 @@ Generated repository overview showing detected technology stack, AI-generated pr
 * Module-level insights
 * AI-powered analysis using GitHub Models GPT-5
 
-<img width="1782" height="899" alt="image" src="https://github.com/user-attachments/assets/614351e8-a1e2-4f20-9bc7-f8c44260e4ab" />
+<img width="1414" height="899" alt="image" src="https://github.com/user-attachments/assets/e7dc9c82-0b84-4a6d-a0aa-4dc52d04926b" />
+
 
 
 ---
@@ -150,7 +151,8 @@ GPT-5 generated architecture diagram rendered using React Flow.
 * Drag-and-reposition nodes
 * Clear system understanding at a glance
 
-*Screenshot:* `screenshots/architecture-diagram.png`
+<img width="1422" height="891" alt="image" src="https://github.com/user-attachments/assets/6fe467d6-2289-4c8b-bb0f-bd7121278352" />
+
 
 ---
 
@@ -165,7 +167,8 @@ AI-generated recommendations categorized by security, performance, scalability, 
 * Performance improvement opportunities
 * Scalability suggestions
 
-*Screenshot:* `screenshots/recommendations.png`
+<img width="1426" height="891" alt="image" src="https://github.com/user-attachments/assets/9bf59cd9-6dc7-4d22-b3d7-6f26346afb37" />
+
 
 
 ## 🧩 Microsoft AI Stack Usage
