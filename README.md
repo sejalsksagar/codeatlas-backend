@@ -1,4 +1,4 @@
-# CodeAtlas AI - Backend
+# CodeAtlas AI 
 
 Understand any GitHub repository in minutes, not days.
 
