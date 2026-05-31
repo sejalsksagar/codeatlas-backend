@@ -12,10 +12,10 @@ Understand any GitHub repository in minutes, not days.
 
 ## Live Demo & Resources
 
-- **Live Frontend:** [Frontend URL]
-- **Backend API:** [Render URL]
-- **Frontend Repository:** [Frontend GitHub URL]
-- **Backend Repository:** [Backend GitHub URL]
+- **Live Frontend:** [https://codeatlas-frontend-khaki.vercel.app/]
+- **Backend API:** [Render URL](https://codeatlas-backend-5hnr.onrender.com/)
+- **Frontend Repository:** [https://github.com/sejalsksagar/codeatlas-frontend/]
+- **Backend Repository:** [https://github.com/sejalsksagar/codeatlas-backend/]
 
 ## Theme
 
@@ -212,7 +212,7 @@ GitHub Actions automatically executes backend tests on every push to ensure code
 
 ## Frontend Setup
 
-For frontend installation and setup, refer to the [Frontend Repository](https://github.com/sejalsksagar/codeatlas-frontend).
+For frontend installation and setup, refer to the Readme File of [Frontend Repository](https://github.com/sejalsksagar/codeatlas-frontend).
 
 ### Frontend Stack
 - **Next.js 14** - React framework
@@ -232,31 +232,29 @@ For frontend installation and setup, refer to the [Frontend Repository](https://
 - Multi-repository analysis and comparison
 - Custom analysis templates
 - API rate limiting and usage analytics
+- Auto-deploy on render on every commit
 
 ## Team
 
 ### Member 1
 **Role:** Backend Engineering & AI Integration  
-**LinkedIn:** [Add LinkedIn]
+**LinkedIn:** [https://www.linkedin.com/in/sejalsksagar/]
 
 ### Member 2
 **Role:** Frontend Engineering & UI/UX  
-**LinkedIn:** [Add LinkedIn]
+**LinkedIn:** [https://www.linkedin.com/in/priya-sharma-mitwpu/]
 
 ### Member 3
 **Role:** Architecture, Integration & Product Presentation  
-**LinkedIn:** [Add LinkedIn]
+**LinkedIn:** [https://www.linkedin.com/in/soumyashri-singha-6850a2210/]
 
 ## Project Links
 
-- **Live Application:** [Frontend URL]
-- **Backend API:** [Render URL]
-- **Frontend Repository:** [Frontend GitHub URL]
-- **Backend Repository:** [Backend GitHub URL]
+- **Live Frontend:** [https://codeatlas-frontend-khaki.vercel.app/]
+- **Backend API:** [https://codeatlas-backend-5hnr.onrender.com/]
+- **Frontend Repository:** [https://github.com/sejalsksagar/codeatlas-frontend/]
+- **Backend Repository:** [https://github.com/sejalsksagar/codeatlas-backend/]
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
