@@ -64,39 +64,156 @@ Output the JSON object now:"""
 # ------------------------------------------------------------------ #
 
 
-def build_diagram_prompt(
-    repo_name: str,
-    stack: dict,
-    modules: list[str],
-) -> str:
-    """
-    Build a prompt that asks the LLM to return a Mermaid.js ``graph TD`` diagram.
-
-    The response must be raw Mermaid text — no fences, no explanation.
-    """
+def build_diagram_prompt(repo_name: str, stack: dict, modules: list[str]) -> str:
     framework = stack.get("framework") or stack.get("frameworks") or "unknown"
     db = stack.get("database") or stack.get("db") or "none detected"
-    module_names = ", ".join(modules[:20])  # cap to avoid token bloat
+    module_names = ", ".join(modules[:30])
 
-    return f"""You are a software architecture expert.
+    return f"""
+You are a senior software architecture reverse-engineering expert.
+
+Your task is to infer the TRUE high-level architecture of a code repository and output it as a Mermaid "graph TD" diagram.
 
 Repository: {repo_name}
-Primary framework: {framework}
+Detected framework(s): {framework}
 Database / storage: {db}
-Key modules / directories: {module_names}
+Available modules/directories:
+{module_names}
 
-Your task: return ONLY valid Mermaid.js graph TD syntax that visualises the \
-high-level architecture of this project.
+IMPORTANT ARCHITECTURE ABSTRACTION RULE:
 
-Rules:
-  - Start directly with "graph TD" — no code fences, no backticks, no explanation.
-  - Show the main components (entry points, routers/controllers, services, \
-data layer, external APIs) as nodes.
-  - Use meaningful node IDs and labels derived from the actual module names above.
-  - Add directional arrows to show data / request flow.
-  - Keep it concise: 6-14 nodes maximum.
+You are NOT restricted to directory names.
 
-Output the Mermaid diagram now:"""
+You MUST map code structure → system components.
+
+Allowed transformations:
+- fastapi/ → FastAPI core framework
+- routing/ → routing subsystem
+- security/ → auth/security subsystem
+- openapi/ → schema generation system
+
+DO NOT treat:
+- tests, docs, scripts as architecture nodes unless they participate in runtime behavior
+
+Tests/docs/scripts should be placed ONLY as side nodes disconnected from core system flow.
+
+------------------------------------------------------------
+CRITICAL RULES
+------------------------------------------------------------
+
+1. OUTPUT FORMAT
+- Output ONLY Mermaid graph TD
+- No explanations, no markdown, no backticks
+- Must start with: graph TD
+
+2. NO CYCLICAL GRAPHS
+- The graph MUST be a Directed Acyclic Graph (DAG)
+- NO cycles, NO bidirectional edges
+- If a relationship is bidirectional, choose ONLY the dominant direction
+
+3. NO FORCED PIPELINE STRUCTURE
+- Do NOT assume architecture is linear (A → B → C → D)
+- Do NOT default to "entry → routing → service → data"
+- Only use linear flow IF the repo explicitly behaves like a pipeline system
+
+------------------------------------------------------------
+STEP 1: CLASSIFY ARCHITECTURE TYPE
+------------------------------------------------------------
+
+Infer ONE primary architecture style:
+
+A. HUB-AND-SPOKE (frameworks like FastAPI, Express, Django)
+   - Central core with multiple independent subsystems
+
+B. LAYERED (traditional backend apps)
+   - entry → routing → business logic → data access
+
+C. MODULAR / PLUGIN-BASED (libraries, extensible systems)
+   - core engine → plugins/extensions/modules
+
+D. EVENT-DRIVEN (async systems, messaging systems)
+   - event source → dispatcher → handlers → sinks
+
+E. PIPELINE (ONLY if explicitly sequential processing)
+   - strict step-by-step transformation flow
+
+F. CLI / TOOLING
+   - CLI entry → parser → commands → utilities
+
+G. FRONTEND ARCHITECTURE
+   - entry → components → state → API layer
+
+------------------------------------------------------------
+STEP 2: BUILD GRAPH BASED ON STYLE (IMPORTANT)
+------------------------------------------------------------
+
+IF HUB-AND-SPOKE:
+- Create ONE central node (core/framework)
+- Connect it to independent subsystems
+- Subsystems should NOT depend on each other unless clearly implied
+
+IF LAYERED:
+- Build top-down layers
+- Each layer may depend on lower layers only
+
+IF MODULAR / PLUGIN:
+- core engine → modules/plugins/utilities
+- plugins should NOT form chains unless explicitly implied
+
+IF EVENT-DRIVEN:
+- event source → dispatcher/bus → handlers → external systems
+- avoid linear chains
+
+IF PIPELINE:
+- ONLY then use strict linear flow
+
+IF CLI:
+- CLI entry → parser → commands → utilities → external calls
+
+IF FRONTEND:
+- UI entry → components → state → API client → backend
+
+------------------------------------------------------------
+STEP 3: NODE RULES
+------------------------------------------------------------
+
+- Nodes MUST come from actual module names OR clearly inferred architectural roles
+- You MAY group folders into meaningful components (e.g., "routing/", "auth/")
+- Do NOT invent unrelated layers
+
+------------------------------------------------------------
+STEP 4: EDGE RULES
+------------------------------------------------------------
+
+Edges represent ONLY:
+- runtime flow OR
+- import dependency OR
+- initialization order OR
+- control flow
+
+DO NOT:
+- force sequential chains
+- connect everything to everything
+- create artificial "step-by-step pipelines"
+
+------------------------------------------------------------
+STEP 5: SIZE CONSTRAINT
+------------------------------------------------------------
+
+- 6 to 14 nodes total
+- Prefer hub or modular structure over long chains
+
+------------------------------------------------------------
+FINAL OUTPUT RULES
+------------------------------------------------------------
+
+- Must be valid Mermaid graph TD
+- Must be DAG
+- Must reflect correct architecture type
+- Must avoid artificial linearization
+
+Now generate the architecture diagram:
+"""
 
 
 # ------------------------------------------------------------------ #
