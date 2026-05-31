@@ -603,11 +603,11 @@ services:
             "docker-compose.yml": self.COMPOSE_KAFKA,
         }
         result = run(detect_stack(file_paths, file_contents))
-        assert "Java"             in result.languages
-        assert "Spring Boot"      in result.frameworks
-        assert "PostgreSQL"       in result.databases
-        assert "MongoDB"          in result.databases
-        assert "Kafka"            in result.infra
-        assert "Docker Compose"   in result.infra
+        assert "Java" in result.languages
+        assert "Spring Boot" in result.frameworks
+        assert "PostgreSQL" in result.databases
+        assert "MongoDB" in result.databases
+        assert "Kafka" in result.infra
+        assert "Docker Compose" in result.infra
         assert "Spring Boot Test" in result.test_frameworks
-        assert "JUnit"            in result.test_frameworks
+        assert "JUnit" in result.test_frameworks

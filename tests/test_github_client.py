@@ -5,7 +5,7 @@ Run:
     python -m pytest tests/test_github_client.py
 """
 import pytest
-import respx
+import respx  # type: ignore[import]
 import httpx
 from core.github_client import (
     GitHubClient,
