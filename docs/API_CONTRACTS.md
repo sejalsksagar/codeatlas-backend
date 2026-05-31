@@ -102,13 +102,13 @@ Full repository analysis. Fetches the file tree, detects the technology stack, a
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `repo_url` | string | ✅ | — | Public GitHub repository URL |
-| `branch` | string | | `"HEAD"` | Branch name, tag, or commit SHA |
+| `branch` | string | | `"HEAD"` | Branch name, tag, or commit SHA; Use "HEAD" to get default main branch each time |
 | `question` | string | | `null` | Reserved for `/ask` — ignored by this endpoint |
 
 ```json
 {
   "repo_url": "https://github.com/tiangolo/fastapi",
-  "branch": "master"
+  "branch": "HEAD"
 }
 ```
 
@@ -118,7 +118,7 @@ Full repository analysis. Fetches the file tree, detects the technology stack, a
 {
   "status": "ok",
   "repo": "tiangolo/fastapi",
-  "branch": "master",
+  "branch": "HEAD",
   "stack": {
     "languages":       ["Python", "JavaScript/TypeScript"],
     "frameworks":      ["FastAPI"],

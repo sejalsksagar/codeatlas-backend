@@ -262,6 +262,20 @@ class GitHubClient:
     # Public API
     # ------------------------------------------------------------------ #
 
+    async def get_default_branch(
+        self,
+        owner: str,
+        repo: str,
+    ) -> str:
+        response = await self._get_api(
+            f"/repos/{owner}/{repo}",
+            owner=owner,
+            repo=repo,
+        )
+
+        data = response.json()
+        return data["default_branch"]
+
     async def get_tree(
         self,
         owner: str,
@@ -293,6 +307,9 @@ class GitHubClient:
             RateLimitError:     API rate limit exceeded.
             GitHubTimeoutError: Request timed out.
         """
+        if branch == "HEAD":
+            branch = await self.get_default_branch(owner, repo)
+            
         url = f"/repos/{owner}/{repo}/git/trees/{branch}"
         params = {"recursive": "1"}
 
