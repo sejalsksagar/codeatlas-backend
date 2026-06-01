@@ -1,21 +1,77 @@
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="CodeAtlas API")
+from core.config import settings
+from core.github_client import GitHubClient
+from models.schemas import HealthResponse
+from routers import analyze, diagram, suggestions
 
+
+# ------------------------------------------------------------------ #
+# Lifespan: startup / shutdown hooks
+# ------------------------------------------------------------------ #
+
+# Persistent GitHub client
+github_client = GitHubClient(
+    token=settings.GITHUB_TOKEN
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Startup
+    yield
+    # Shutdown — close persistent HTTP clients
+    await github_client.close()
+
+
+# ------------------------------------------------------------------ #
+# App factory
+# ------------------------------------------------------------------ #
+
+
+app = FastAPI(
+    title="CodeAtlas API",
+    description="AI-powered GitHub repository analysis backend.",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Routers
+app.include_router(analyze.router)
+app.include_router(diagram.router)
+app.include_router(suggestions.router)
 
-@app.get("/")
-def home():
-    return {"message": "CodeAtlas backend running"}
+
+# ------------------------------------------------------------------ #
+# Core endpoints
+# ------------------------------------------------------------------ #
 
 
-@app.get("/health")
-def health():
-    return {"status":"working"}
+@app.get("/health", response_model=HealthResponse, tags=["health"])
+async def health() -> dict:
+    """Liveness probe."""
+    return {"status": "ok"}
+
+
+# ------------------------------------------------------------------ #
+# Dev entrypoint
+# ------------------------------------------------------------------ #
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
